@@ -164,13 +164,13 @@ async fn spawn_app() -> TestApp {
     }
 }
 
-async fn _configure_database(config: &DatabaseSettings) -> PgPool {
+/*async fn _configure_database(config: &DatabaseSettings) -> PgPool {
     //let mut conn = PgConnection::connect(&conf.connection_string_no_db())
 
     /*let mut connection = PgConnection::connect(&config.connection_string_no_db()).await.expect("Oooops database");
     let urk = format!(r#"CREATE DATABASE "{}";"#, config.database_name);
     connection.execute(urk.as_str()).await.expect("oops create");*/
-    let connection_pool = PgPool::connect(&config.connection_string())
+    let connection_pool = PgConnection::connect_with(&config.wi())
         .await
         .expect("Failed to connect to Postgres.");
     sqlx::migrate!("./migrations")
@@ -178,17 +178,17 @@ async fn _configure_database(config: &DatabaseSettings) -> PgPool {
         .await
         .expect("Oooops migration");
     connection_pool
-}
+}*/
 
 async fn configure_database(config: &DatabaseSettings) -> PgPool {
-    let mut connection = PgConnection::connect(&config.connection_string_no_db())
+    let mut connection = PgConnection::connect_with(&config.whithout_db())
         .await
         .expect("Oooops database");
     let urk = format!(r#"DROP DATABASE IF EXISTS "{}";"#, config.database_name);
     connection.execute(urk.as_str()).await.expect("oops drop");
     let urk = format!(r#"CREATE DATABASE "{}";"#, config.database_name);
     connection.execute(urk.as_str()).await.expect("oops create");
-    let connection_pool = PgPool::connect(&config.connection_string())
+    let connection_pool = PgPool::connect_with(config.with_db())
         .await
         .expect("Failed to connect to Postgres.");
     sqlx::migrate!("./migrations")
