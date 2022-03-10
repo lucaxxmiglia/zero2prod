@@ -2,6 +2,7 @@ use zero2prod::run;
 use zero2prod::configuration::get_configuration;
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 use sqlx::postgres::PgPoolOptions;
+use zero2prod::email_client::EmailClient;
 
 
 #[tokio::main]
@@ -16,5 +17,7 @@ async fn main() -> std::io::Result<()> {
    //let connection_pool = PgPool::connect_lazy(configuration.database.with_db()).expect("Ooop connessione");
    let address = format! ("{}:{}", configuration.application.host, configuration.application.port);
    let list = std::net::TcpListener::bind(address)?;
-   run(list, connection_pool)?.await
+   let sender_email = configuration.email_client.sender().expect("Ooops sender");
+   let email_client = EmailClient::new(configuration.email_client.base_url, sender_email);
+   run(list, connection_pool, email_client)?.await
 }

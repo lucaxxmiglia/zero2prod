@@ -6,3 +6,6 @@ database:
   username: "xx"
   password: "sxdcfvgb"
   database_name: "newsletter"
+email_client:
+  base_url: "https://api.postmarkapp.com"
+  sender_email: "luca@xxmiglia.com"

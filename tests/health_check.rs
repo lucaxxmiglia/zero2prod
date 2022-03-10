@@ -2,6 +2,7 @@ use once_cell::sync::Lazy;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
 use zero2prod::configuration::{get_configuration, DatabaseSettings};
+use zero2prod::email_client::EmailClient;
 use zero2prod::telemetry::*;
 
 pub struct TestApp {
@@ -154,9 +155,15 @@ async fn spawn_app() -> TestApp {
     //conf.database.database_name = format!("{}_test",conf.database.database_name);
     configuration.database.database_name = format!("test_{}", Uuid::new_v4().to_string());
     let connection_pool = configure_database(&configuration.database).await;
+    let sender_email = configuration
+        .email_client
+        .sender()
+        .expect("Invalid sender email address.");
+    let email_client = EmailClient::new(configuration.email_client.base_url, sender_email);
     //let connection_pool = PgPool:: connect(&configuration.database.connection_string()).await.expect("Failed to connect to Postgres.");
 
-    let server = zero2prod::run(listener, connection_pool.clone()).expect("ooops server");
+    let server =
+        zero2prod::run(listener, connection_pool.clone(), email_client).expect("ooops server");
     let _ = tokio::spawn(server);
     TestApp {
         address: format!("http://127.0.0.1:{}", port),
