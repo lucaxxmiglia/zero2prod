@@ -1,0 +1,1 @@
+for db in `psql -c '\l' | grep test_* | cut -d '|' -f 1`; do psql -c "drop database \"$db\""; done
