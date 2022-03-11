@@ -9,3 +9,5 @@ database:
 email_client:
   base_url: "https://api.postmarkapp.com"
   sender_email: "luca@xxmiglia.com"
+  authorization_token: "my-secret-value"
+  timeout_milliseconds: 10000
