@@ -18,3 +18,4 @@ pub fn get_subscriber<Sink>(name: String, env_filter: String, sink: Sink) -> imp
     LogTracer::init().expect("ooops logtracer");
     set_global_default(subscriber).expect("Ooops subscriber");
  }
+

@@ -9,7 +9,7 @@ pub struct EmailClient {
     authorization_token: String,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Debug)]
 #[serde(rename_all="PascalCase")]
 pub struct SendEmailRequest<'a> {
     from: &'a str,
@@ -44,8 +44,9 @@ impl EmailClient {
             html_content: html_content,
             text_content: text_content,
         };
-
-        let _builder = self.http_client.post(&url).header("X-Postmark-Server-Token", self.authorization_token.clone()).json(&request_body).send().await?.error_for_status()?;
+        
+        let _builder = self.http_client.post(&url).header("X-Postmark-Server-Token", self.authorization_token.clone()).json(&request_body).send().await?.error_for_status();
+        
         Ok(())
     }
 }

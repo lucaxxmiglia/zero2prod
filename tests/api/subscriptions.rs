@@ -2,15 +2,23 @@ use crate::helpers::spawn_app;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock,ResponseTemplate};
 
-//#[tokio::test]
+#[tokio::test]
 async fn subscribe_returns_a_200_for_valid_form_data() {
     let test_app = spawn_app().await;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
     let response = test_app.post_subscription(body.into()).await;
     
     assert_eq!(response.status().as_u16(), 200);
+    
+}
 
-    let saved = sqlx::query!("select email, name FROM subscriptions",)
+#[tokio::test]
+async fn subscribe_persists_the_new_subscriber() {
+    let test_app = spawn_app().await;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+    test_app.post_subscription(body.into()).await;
+
+    let saved = sqlx::query!("select email, name, status FROM subscriptions",)
         .fetch_one(&test_app.db_pool)
         .await
         .expect("Oooops query");
@@ -18,6 +26,7 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
     assert_eq!(saved.email, "ursula_le_guin@gmail.com");
  
     assert_eq!(saved.name, "le guin");
+    assert_eq!(saved.status, "pending_confirmation");
 }
 
 #[tokio::test]
@@ -97,20 +106,7 @@ async fn subscribe_sends_a_confirmation_email_with_a_link() {
     test_app.post_subscription(body.into()).await;
 
     let email_request = &test_app.email_server.received_requests().await.unwrap()[0];
-
-    let body : serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();
-
-    let get_links = | s: &str| {
-        let links: Vec<_> = linkify::LinkFinder::new()
-        .links(s)
-        .filter(|l| *l.kind() == linkify::LinkKind::Url)
-        .collect();
-        assert_eq!(links.len(),1);
-        links[0].as_str().to_owned()
-    };
-
-    let html_link= get_links(&body["HtmlContent"].as_str().unwrap());
-    let text_link= get_links(&body["TextContent"].as_str().unwrap());
-
-    assert_eq!(html_link,text_link);    
+    let confirmation_links = test_app.get_confirmation_link(&email_request);
+    
+    assert_eq!(confirmation_links.html,confirmation_links.plain_text);    
 }
