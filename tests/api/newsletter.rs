@@ -45,18 +45,40 @@ async fn newsletters_are_delivered_to_confirmed() {
         }
     });
 
-    let response = reqwest::Client::new()
-        .post(&format!("{}/newsletter",&app.address))
-        .json(&news_body)
-        .send()
-        .await
-        .expect("Oooops exec req");
+    let response = app.post_newsletter(news_body).await;
 
     assert_eq!(response.status().as_u16(),200);
 }
 
 #[tokio::test]
 async fn newsletter_returns_400_for_invalid_data() {
+    let app = spawn_app().await;
+
+    let news_body = serde_json::json!({
+        "title" : "Newsletter title",
+        "contentx": {
+            "text": "news plain text",
+            "html":"<p>news html text</p>"
+        }
+    });
+
+    /*let response = reqwest::Client::new()
+    .post(&format!("{}/newsletter",&app.address))
+    .json(&news_body)
+    .send()
+    .await
+    .expect("Oooops exec req");*/
+    let response = app.post_newsletter(news_body).await;
+    
+
+    assert_eq!(response.status().as_u16(),400);
+    //assert_eq!(r#"Basic realm="publish""#, response.headers()["WWW-Authenticate"]);
+    
+    
+}
+
+#[tokio::test]
+async fn request_missing_authorization_are_rejected() {
     let app = spawn_app().await;
 
     let test_cases=vec![

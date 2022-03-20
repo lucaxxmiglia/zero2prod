@@ -59,12 +59,22 @@ impl TestApp {
     }
 
     pub async fn post_newsletter(&self, body:serde_json::Value) -> reqwest::Response {
+        let (username, password) = self.test_user().await;
          reqwest::Client::new()
         .post(&format!("{}/newsletter",&self.address))
+        .basic_auth(username, Some(password))
         .json(&body)
         .send()
         .await
         .expect("Oooops exec req")
+    }
+
+    pub async fn test_user(&self) -> (String,String) {
+        let row = sqlx::query!("SELECT username, password from users LIMIT 1")
+        .fetch_one(&self.db_pool)
+        .await
+        .expect("Oooops user");
+        (row.username, row.password)
     }
 }
 
@@ -99,13 +109,23 @@ pub async fn spawn_app() -> TestApp {
     let _ = tokio::spawn(application.run_until_stopped());
     
 
-    TestApp {
+    let ta = TestApp {
         address:address,
         db_pool:  get_connection_pool(&configuration.database),
         email_server,
         port: app_port
-    }
+    };
+    add_test_user(&ta.db_pool).await;
+    ta
 }
+
+async fn add_test_user(pool: &PgPool) {
+    sqlx::query!("INSERT into users (user_id, username, password) VALUES ($1,$2,$3)",Uuid::new_v4(), Uuid::new_v4().to_string(),Uuid::new_v4().to_string())
+    .execute(pool)
+    .await
+    .expect("Ooops insert users");
+}
+
 
 async fn configure_database(config: &DatabaseSettings) -> PgPool {
     let mut connection = PgConnection::connect_with(&config.whithout_db())

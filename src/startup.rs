@@ -8,6 +8,7 @@ use crate::email_client::EmailClient;
 use crate::configuration::Settings;
 use sqlx::postgres::PgPoolOptions;
 use crate::configuration::DatabaseSettings;
+use secrecy::Secret;
 
 pub struct Application {
     port: u16,
@@ -24,7 +25,7 @@ impl Application {
         
         let email_client = EmailClient::new(configuration.email_client.base_url.clone(), sender_email, configuration.email_client.authorization_token.clone(), timeout);
         let port = list.local_addr().unwrap().port();
-        let server = run(list, conn_pool, email_client, configuration.application.base_url)?;
+        let server = run(list, conn_pool, email_client, configuration.application.base_url, configuration.application.hmac_secret)?;
         Ok(Self{port, server})
     }
 
@@ -40,11 +41,14 @@ impl Application {
 
 pub struct ApplicationBaseUrl(pub String);
 
+#[derive(Debug)]
+pub struct HmacSecret(pub Secret<String>);
+
 pub fn get_connection_pool(configuration: &DatabaseSettings) ->PgPool{
     PgPoolOptions::new().connect_timeout(std::time::Duration::from_secs(2)).connect_lazy_with(configuration.with_db())
 }
 
-pub fn run(listener: TcpListener, db_poop: PgPool, email_client:EmailClient, base_url: String) -> Result<Server,std::io::Error> {
+pub fn run(listener: TcpListener, db_poop: PgPool, email_client:EmailClient, base_url: String, hmac_secret: Secret<String>) -> Result<Server,std::io::Error> {
    let db_poop = web::Data::new(db_poop);
    let email_client = web::Data::new(email_client);
    let base_url = web::Data::new(ApplicationBaseUrl(base_url));
@@ -55,9 +59,13 @@ pub fn run(listener: TcpListener, db_poop: PgPool, email_client:EmailClient, bas
             .route("/subscribe", web::post().to(crate::routes::subscribe))
             .route("/newsletter", web::post().to(crate::routes::publish_newsletter))
             .route("/subscriptions/confirm", web::get().to(crate::routes::confirm))
+            .route("/", web::get().to(crate::routes::home))
+            .route("/login", web::get().to(crate::routes::login_form))
+            .route("/login", web::post().to(crate::routes::login))
             .app_data(db_poop.clone())
             .app_data(email_client.clone())
             .app_data(base_url.clone())
+            .app_data(web::Data::new(HmacSecret(hmac_secret.clone())))
     })
     .listen(listener)?
     .run();
