@@ -11,7 +11,8 @@ pub struct TestApp {
     pub address: String,
     pub db_pool: PgPool,
     pub email_server: MockServer,
-    pub port: u16
+    pub port: u16,
+    pub api_client: reqwest::Client
 }
 
 pub struct ConfirmationLink {
@@ -22,7 +23,7 @@ pub struct ConfirmationLink {
 impl TestApp {
     pub async fn post_subscription(&self, body: String) -> reqwest::Response {
         let client = reqwest::Client::new();
-        let response = client
+        let response = self.api_client
         .post(&format!("{}/subscribe", &self.address))
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
@@ -60,7 +61,7 @@ impl TestApp {
 
     pub async fn post_newsletter(&self, body:serde_json::Value) -> reqwest::Response {
         let (username, password) = self.test_user().await;
-         reqwest::Client::new()
+        self.api_client
         .post(&format!("{}/newsletter",&self.address))
         .basic_auth(username, Some(password))
         .json(&body)
@@ -75,6 +76,26 @@ impl TestApp {
         .await
         .expect("Oooops user");
         (row.username, row.password)
+    }
+
+    pub async fn post_login<Body>(&self, body: &Body) -> reqwest::Response where Body: serde::Serialize{
+        self.api_client
+        .post(&format!("{}/login",&self.address))
+        .form(body)
+        .send()
+        .await
+        .expect("Oooops exec req")
+    }
+
+    pub async fn get_login_html(&self) -> String {
+        self.api_client
+        .get(&format!("{}/login",&self.address))
+        .send()
+        .await
+        .expect("Oooops exec req")
+        .text()
+        .await
+        .unwrap()
     }
 }
 
@@ -92,6 +113,12 @@ static TRACING: Lazy<()> = Lazy::new(|| {
 
 pub async fn spawn_app() -> TestApp {
     Lazy::force(&TRACING);
+    let client =  reqwest::Client::builder()
+    .redirect(reqwest::redirect::Policy::none())
+    .cookie_store(true)
+    .build()
+    .unwrap();
+
     let email_server = MockServer::start().await;
     let  configuration = {
         let mut c = get_configuration().expect("Ooops configuration");
@@ -113,7 +140,8 @@ pub async fn spawn_app() -> TestApp {
         address:address,
         db_pool:  get_connection_pool(&configuration.database),
         email_server,
-        port: app_port
+        port: app_port,
+        api_client: client,
     };
     add_test_user(&ta.db_pool).await;
     ta
@@ -145,3 +173,7 @@ async fn configure_database(config: &DatabaseSettings) -> PgPool {
     connection_pool
 }
 
+pub fn assert_is_redirected_to(response: &reqwest::Response, location: &str) {
+    assert_eq!(response.status().as_u16(),303);
+    assert_eq!(response.headers().get("Location").unwrap(), location)
+}

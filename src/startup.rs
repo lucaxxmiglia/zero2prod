@@ -1,6 +1,9 @@
 
 use actix_web::{web, App, HttpServer};
 use actix_web::dev::Server;
+use actix_web::cookie::Key;
+use actix_web_flash_messages::FlashMessagesFramework;
+use actix_web_flash_messages::storage::CookieMessageStore;
 use tracing_actix_web::TracingLogger;
 use std::net::TcpListener;
 use sqlx::PgPool;
@@ -9,6 +12,7 @@ use crate::configuration::Settings;
 use sqlx::postgres::PgPoolOptions;
 use crate::configuration::DatabaseSettings;
 use secrecy::Secret;
+use secrecy::ExposeSecret;
 
 pub struct Application {
     port: u16,
@@ -52,6 +56,8 @@ pub fn run(listener: TcpListener, db_poop: PgPool, email_client:EmailClient, bas
    let db_poop = web::Data::new(db_poop);
    let email_client = web::Data::new(email_client);
    let base_url = web::Data::new(ApplicationBaseUrl(base_url));
+   let msg_store = CookieMessageStore::builder(Key::from(hmac_secret.expose_secret().as_bytes())).build();
+   let msg_framework = FlashMessagesFramework::builder(msg_store).build();
    let server=  HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())
